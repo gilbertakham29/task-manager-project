@@ -3,6 +3,7 @@ import "tabulator-tables/dist/css/tabulator.min.css";
 import { useEffect, useRef, useState } from "react";
 import { ToastContainer, toast } from "react-toastify";
 import PropTypes from "prop-types";
+// eslint-disable-next-line react/prop-types
 const TaskTable = ({ tasks = [], setTasks, deleteTask }) => {
   const tableRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState("");

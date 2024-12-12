@@ -3,35 +3,28 @@ import "tabulator-tables/dist/css/tabulator.min.css";
 import { useEffect, useRef, useState } from "react";
 import { ToastContainer, toast } from "react-toastify";
 import PropTypes from "prop-types";
-// eslint-disable-next-line react/prop-types
+import "react-toastify/dist/ReactToastify.css";
+
 const TaskTable = ({ tasks = [], setTasks, deleteTask }) => {
   const tableRef = useRef(null);
+  const tabulatorRef = useRef(null); // Reference to the Tabulator instance
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredTasks, setFilteredTasks] = useState(tasks);
+  const [taskCounts, setTaskCounts] = useState({});
+
   const calculateCounts = (taskArray) => ({
     "To Do": taskArray.filter((task) => task.status === "To Do").length,
     "In Progress": taskArray.filter((task) => task.status === "In Progress")
       .length,
     Done: taskArray.filter((task) => task.status === "Done").length,
   });
-  const [taskCounts, setTaskCounts] = useState(calculateCounts(tasks));
-  // Initialize Tabulator table
+
   useEffect(() => {
-    const updatedFilteredTasks =
-      searchQuery.trim() === ""
-        ? tasks
-        : tasks.filter(
-            (task) =>
-              task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              task.description.toLowerCase().includes(searchQuery.toLowerCase())
-          );
-    setFilteredTasks(updatedFilteredTasks);
-    setTaskCounts(calculateCounts(tasks));
-    if (tableRef.current) {
-      const table = new Tabulator(tableRef.current, {
-        data: updatedFilteredTasks, // Pass the tasks as data
+    // Initialize Tabulator only once
+    if (tableRef.current && !tabulatorRef.current) {
+      tabulatorRef.current = new Tabulator(tableRef.current, {
+        data: tasks, // Initial data
         layout: "fitDataTable",
-        // Adjust columns to fit the container width
+        responsiveLayout: "hide",
         columns: [
           {
             title: "Task ID",
@@ -42,19 +35,19 @@ const TaskTable = ({ tasks = [], setTasks, deleteTask }) => {
           {
             title: "Title",
             field: "title",
-            editor: "input",
-            width: "25%", // Inline editor for Title
+            editor: "input", // Inline editor for Title
+            width: "25%",
           },
           {
             title: "Description",
             field: "description",
-            editor: "textarea",
-            width: "35%", // Inline editor for Description
+            editor: "textarea", // Inline editor for Description
+            width: "35%",
           },
           {
             title: "Status",
             field: "status",
-            editor: "textarea", // Dropdown editor for Status
+            editor: "select", // Dropdown editor for Status
             editorParams: {
               values: ["To Do", "In Progress", "Done"], // Dropdown options
             },
@@ -66,7 +59,9 @@ const TaskTable = ({ tasks = [], setTasks, deleteTask }) => {
             align: "center",
             width: 100,
             cellClick: (e, cell) => {
-              deleteTask(cell.getRow().getData().id); // Handle task deletion
+              const id = cell.getRow().getData().id;
+              deleteTask(id);
+              toast.success("Task deleted successfully!");
             },
           },
         ],
@@ -80,14 +75,36 @@ const TaskTable = ({ tasks = [], setTasks, deleteTask }) => {
           toast.success("Task updated successfully!");
         },
       });
-
-      // Cleanup on unmount
-      return () => table.destroy();
     }
-  }, [tasks, setTasks, searchQuery, deleteTask, filteredTasks]);
+
+    // Update table data whenever `tasks` change
+    if (tabulatorRef.current) {
+      tabulatorRef.current.setData(tasks);
+      setTaskCounts(calculateCounts(tasks));
+    }
+  }, [tasks, setTasks, deleteTask]);
+
+  // Filter tasks based on search query
+  useEffect(() => {
+    if (tabulatorRef.current) {
+      const filteredTasks =
+        searchQuery.trim() === ""
+          ? tasks
+          : tasks.filter(
+              (task) =>
+                task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                task.description
+                  .toLowerCase()
+                  .includes(searchQuery.toLowerCase())
+            );
+
+      tabulatorRef.current.setData(filteredTasks);
+      setTaskCounts(calculateCounts(filteredTasks));
+    }
+  }, [searchQuery, tasks]);
 
   return (
-    <div className="overflow-x-auto flex flex-col items-center justify-center bg-gray-100  shadow-md rounded-lg">
+    <div className="overflow-x-auto flex flex-col items-center justify-center bg-gray-100 shadow-md rounded-lg">
       <ToastContainer
         position="top-right"
         style={{ width: "50%", height: "15%" }}
@@ -96,13 +113,13 @@ const TaskTable = ({ tasks = [], setTasks, deleteTask }) => {
       <div className="w-full max-w-4xl p-4 space-y-4">
         <div className="flex justify-between space-x-4">
           <div className="bg-blue-200 p-2 rounded">
-            To Do: {taskCounts["To Do"]}
+            To Do: {taskCounts["To Do"] || 0}
           </div>
           <div className="bg-yellow-200 p-2 rounded">
-            In Progress: {taskCounts["In Progress"]}
+            In Progress: {taskCounts["In Progress"] || 0}
           </div>
           <div className="bg-green-200 p-2 rounded">
-            Done: {taskCounts["Done"]}
+            Done: {taskCounts["Done"] || 0}
           </div>
         </div>
         <input
@@ -117,16 +134,18 @@ const TaskTable = ({ tasks = [], setTasks, deleteTask }) => {
     </div>
   );
 };
-TaskTable.PropTypes = {
+
+TaskTable.propTypes = {
   tasks: PropTypes.arrayOf(
     PropTypes.shape({
       id: PropTypes.number.isRequired,
       title: PropTypes.string.isRequired,
       description: PropTypes.string.isRequired,
-      status: PropTypes.oneOf(["To Do", "In Progress", "Done"]),
+      status: PropTypes.oneOf(["To Do", "In Progress", "Done"]).isRequired,
     })
-  ),
+  ).isRequired,
   setTasks: PropTypes.func.isRequired,
   deleteTask: PropTypes.func.isRequired,
 };
+
 export default TaskTable;
